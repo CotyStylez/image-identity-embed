@@ -1,0 +1,6 @@
+{
+  "name": "IdentityEmbed - Image Cryptographic Signer",
+  "description": "Cryptographic Image Ownership Proof and metadata embedding dashboard.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

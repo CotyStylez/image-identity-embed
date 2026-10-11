@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Cryptographic Signer</title>
+    <title>IdentityEmbed - Image Cryptographic Signer & Verifier</title>
+    <meta name="description" content="Cryptographic Image Ownership Proof and metadata embedding dashboard.">
+    <meta property="og:title" content="IdentityEmbed - Image Cryptographic Signer & Verifier">
+    <meta property="og:description" content="Cryptographic Image Ownership Proof and metadata embedding dashboard.">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,182 +15,581 @@
             theme: {
                 extend: {
                     colors: {
-                        darkBg: '#0f172a',
-                        cardBg: '#1e293b',
+                        darkBg: '#0b1120',
+                        cardBg: '#151f32',
+                        cardBorder: '#1e293b',
                         accent: '#6366f1',
-                        accentHover: '#4f46e5'
+                        accentHover: '#4f46e5',
+                        cashGreen: '#00D632',
+                        cashGreenHover: '#00b82b'
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
                     }
                 }
             }
         }
     </script>
-    <!-- Font Inter & FontAwesome Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Cryptography & EXIF Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl-util@0.15.1/nacl-util.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b1120; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-darkBg text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 sm:p-6">
+<body class="bg-darkBg text-slate-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500/30">
 
-    <header class="w-full max-w-4xl mx-auto flex items-center justify-between py-4 border-b border-slate-800">
-        <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <i class="fa-solid fa-fingerprint text-white text-xl"></i>
+    <!-- Top Navigation Bar (Contract: 1 row, 3 zones: Brand - Navigation Tabs - Cash App Action) -->
+    <header class="w-full border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-8">
+            <!-- Zone 1: Single text element wordmark -->
+            <a href="#" onclick="switchMode('sign'); return false;" class="flex items-center gap-2.5 text-slate-100 hover:text-white transition-colors shrink-0">
+                <span class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-base shadow-sm">
+                    <i class="fa-solid fa-fingerprint"></i>
+                </span>
+                <span class="text-base font-bold tracking-tight whitespace-nowrap">IdentityEmbed</span>
+            </a>
+
+            <!-- Zone 2: Navigation Links / Segmented Mode Switcher -->
+            <nav class="flex items-center gap-1.5 p-1 bg-slate-950/70 border border-slate-800 rounded-xl" role="tablist">
+                <button id="tabSign" onclick="switchMode('sign')" role="tab" aria-selected="true"
+                    class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap shrink-0 bg-indigo-600 text-white shadow-sm">
+                    <i class="fa-solid fa-signature"></i>
+                    <span>Sign & Protect</span>
+                </button>
+                <button id="tabVerify" onclick="switchMode('verify')" role="tab" aria-selected="false"
+                    class="px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Verify Authenticity</span>
+                </button>
+            </nav>
+
+            <!-- Zone 3: Primary Action (Support Creator Cash App Modal Trigger) -->
+            <div class="flex items-center gap-3 shrink-0">
+                <button onclick="openCashAppModal(1)" 
+                    class="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all flex items-center gap-2 whitespace-nowrap shrink-0">
+                    <i class="fa-solid fa-dollar-sign text-emerald-200"></i>
+                    <span>Support $static9072</span>
+                </button>
             </div>
-            <div>
-                <h1 class="text-lg font-bold tracking-tight">IdentityEmbed</h1>
-                <p class="text-xs text-slate-400">Cryptographic Image Ownership Proof</p>
-            </div>
-        </div>
-        <div class="text-xs bg-slate-800 text-slate-300 px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            Independent Tool
         </div>
     </header>
 
-    <main class="w-full max-w-4xl mx-auto my-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Main Workspace Container -->
+    <main class="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 flex-1">
         
-        <!-- Left Column: Input Configuration Form -->
-        <section class="bg-cardBg border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-            <div class="space-y-5">
+        <!-- SECTION 1: SIGN & EMBED VIEW -->
+        <div id="viewSign" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- Left Column: Parameters & Cryptographic Keys (7 cols) -->
+            <section class="lg:col-span-6 bg-cardBg border border-cardBorder rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
                 <div>
-                    <h2 class="text-base font-semibold text-slate-200 mb-1">Signature Parameters</h2>
-                    <p class="text-xs text-slate-400">Configure your ownership metadata and keys.</p>
+                    <h2 class="text-base font-bold text-slate-100">Cryptographic Signature Parameters</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Generate or load Ed25519 keypair and embed verifiable provenance into image EXIF.</p>
                 </div>
 
-                <!-- Creator Name Input -->
+                <!-- Creator Name / Identity Input -->
                 <div class="space-y-1.5">
-                    <label class="block text-xs font-medium text-slate-300">Creator Name / Identity</label>
+                    <label for="creatorName" class="block text-xs font-semibold text-slate-300">Creator Identity / Author</label>
                     <div class="relative">
-                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-                            <i class="fa-solid fa-user"></i>
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                            <i class="fa-solid fa-user-check text-xs"></i>
                         </span>
-                        <input type="text" id="creatorName" placeholder="e.g. Satoshi or Your Name" 
-                            class="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all">
+                        <input type="text" id="creatorName" placeholder="e.g. Satoshi Nakamoto or your creative pseudonym" 
+                            class="w-full pl-9 pr-3.5 py-2.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
                     </div>
                 </div>
 
-                <!-- Private Key Section -->
+                <!-- Rights / Copyright (Optional) -->
                 <div class="space-y-1.5">
-                    <div class="flex justify-between items-center">
-                        <label class="block text-xs font-medium text-slate-300">Private Key</label>
-                        <button onclick="generateNewKey()" type="button" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generate New
-                        </button>
-                    </div>
-                    <textarea id="privateKeyInput" rows="2" placeholder="Paste PEM private key or generate one..." 
-                        class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none"></textarea>
+                    <label for="rightsStatement" class="block text-xs font-semibold text-slate-300">Rights & Provenance Statement</label>
+                    <input type="text" id="rightsStatement" value="All Rights Reserved. Original Cryptographic Proof." 
+                        class="w-full px-3.5 py-2 bg-slate-950/80 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
                 </div>
 
-                <!-- Image Upload Section -->
-                <div class="space-y-1.5">
-                    <label class="block text-xs font-medium text-slate-300">Source Image (PNG / JPG)</label>
-                    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-900/50 hover:bg-slate-900 hover:border-slate-600 transition-all">
-                        <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
-                            <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-2xl mb-2"></i>
-                            <p class="text-xs text-slate-300 font-medium" id="uploadLabel">Click to upload or drag & drop</p>
-                            <p class="text-[10px] text-slate-500 mt-1">PNG, JPG or WEBP</p>
+                <!-- Ed25519 Cryptographic Keypair Manager -->
+                <div class="space-y-2.5 pt-1">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-semibold text-slate-300">Ed25519 Cryptographic Keypair</label>
+                        <div class="flex items-center gap-2">
+                            <button onclick="generateEd25519Keypair()" type="button" 
+                                class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors flex items-center gap-1">
+                                <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
+                                <span>New Keypair</span>
+                            </button>
+                            <span class="text-slate-600">·</span>
+                            <button onclick="exportKeypairJson()" type="button" 
+                                class="text-xs text-slate-400 hover:text-slate-200 font-medium transition-colors flex items-center gap-1">
+                                <i class="fa-solid fa-download text-[11px]"></i>
+                                <span>Export Keys</span>
+                            </button>
                         </div>
-                        <input type="file" id="imageUpload" accept="image/png, image/jpeg, image/webp" class="hidden" onchange="handleImageUpload(event)">
-                    </label>
+                    </div>
+
+                    <!-- Secret Key Field -->
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between text-[11px] text-slate-400">
+                            <span>Private Secret Key (Hex)</span>
+                            <button type="button" onclick="toggleSecretVisibility()" id="btnToggleSecret" class="text-slate-400 hover:text-slate-200">
+                                <i class="fa-solid fa-eye-slash mr-1"></i><span>Hide</span>
+                            </button>
+                        </div>
+                        <textarea id="privateKeyInput" rows="2" placeholder="Ed25519 Secret Key in hex or base64..." 
+                            class="w-full p-2.5 bg-slate-950/90 border border-slate-700/80 rounded-xl text-xs font-mono tabular-nums text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"></textarea>
+                    </div>
+
+                    <!-- Public Key Badge & Fingerprint -->
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400 font-medium">Public Signing Key (Shareable):</span>
+                            <button onclick="copyToClipboard(currentPublicKeyHex, 'Public key copied!')" class="text-indigo-400 hover:text-indigo-300 text-[11px]">
+                                <i class="fa-regular fa-copy mr-1"></i>Copy
+                            </button>
+                        </div>
+                        <div id="publicKeyDisplay" class="font-mono tabular-nums text-[11px] text-indigo-300/90 break-all select-all">
+                            Generating keypair...
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Action Button -->
-            <div class="mt-8">
-                <button onclick="processSigning()" id="signButton" disabled 
-                    class="w-full py-3 px-4 bg-accent hover:bg-accentHover disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-medium rounded-xl shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 text-sm">
-                    <i class="fa-solid fa-signature"></i>
-                    Embed Signature & Metadata
-                </button>
-            </div>
-        </section>
-
-        <section class="bg-cardBg border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-            <div class="space-y-4">
-                <div>
-                    <h2 class="text-base font-semibold text-slate-200 mb-1">Result Preview</h2>
-                    <p class="text-xs text-slate-400">Signed image with EXIF metadata embedding.</p>
+                <!-- Source Image Upload Section -->
+                <div class="space-y-1.5 pt-1">
+                    <label class="block text-xs font-semibold text-slate-300">Source Image</label>
+                    <div id="uploadDropzone" 
+                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)"
+                        class="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700/80 border-dashed rounded-xl cursor-pointer bg-slate-950/40 hover:bg-slate-950/80 hover:border-indigo-500/60 transition-all">
+                        <label class="flex flex-col items-center justify-center w-full h-full cursor-pointer px-4 text-center">
+                            <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-2xl mb-2"></i>
+                            <p class="text-xs text-slate-200 font-medium" id="uploadLabel">Click to select image or drag & drop</p>
+                            <p class="text-[11px] text-slate-400 mt-1">JPEG, PNG, or WEBP supported</p>
+                            <input type="file" id="imageUpload" accept="image/jpeg, image/png, image/webp" class="hidden" onchange="handleImageFileSelected(event)">
+                        </label>
+                    </div>
                 </div>
 
-                <!-- Preview Box -->
-                <div id="previewContainer" class="w-full h-64 bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group">
+                <!-- Action Button -->
+                <div class="pt-2">
+                    <button onclick="processSigning()" id="signButton" disabled 
+                        class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-xs sm:text-sm">
+                        <i class="fa-solid fa-signature"></i>
+                        <span>Embed Signature & Provenance EXIF</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Column: Result Preview & Embedded EXIF Inspector (6 cols) -->
+            <section class="lg:col-span-6 bg-cardBg border border-cardBorder rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-100">Signed Artifact Preview</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Real-time image canvas and embedded EXIF UserComment inspector.</p>
+                    </div>
+                    <span id="badgeProcessingState" class="text-[11px] text-slate-400 font-mono">Standby</span>
+                </div>
+
+                <!-- Image Preview Canvas Container -->
+                <div id="previewContainer" class="w-full h-64 sm:h-72 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col items-center justify-center relative overflow-hidden">
                     <div id="placeholderState" class="text-center p-6 text-slate-500">
                         <i class="fa-regular fa-image text-4xl mb-2 text-slate-600"></i>
-                        <p class="text-xs">No image processed yet. Upload and sign to view preview.</p>
+                        <p class="text-xs text-slate-400 font-medium">No image loaded</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Upload a source image on the left to begin signing.</p>
                     </div>
                     <img id="imagePreview" class="w-full h-full object-contain hidden" alt="Signed Preview">
-                    <div id="loadingOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2">
+                    
+                    <div id="loadingOverlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2">
                         <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-3xl"></i>
-                        <p class="text-xs text-slate-300 font-medium">Embedding cryptographic hash...</p>
+                        <p class="text-xs text-slate-200 font-semibold" id="loadingStatusText">Hashing image pixel data...</p>
+                        <p class="text-[11px] text-slate-400">Computing SHA-256 digest & Ed25519 signature</p>
                     </div>
                 </div>
 
-                <!-- Metadata Inspection Box -->
-                <div class="space-y-1">
-                    <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Embedded Metadata Preview</span>
-                    <div id="metadataBox" class="bg-slate-900 border border-slate-800 rounded-xl p-3 h-24 overflow-y-auto text-[11px] font-mono text-slate-400">
-                        Waiting for signature action...
+                <!-- Image File & Hash Telemetry Bar -->
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                        <span class="text-[11px] text-slate-400 block font-medium">Image SHA-256 Digest:</span>
+                        <span id="digestDisplay" class="font-mono tabular-nums text-[11px] text-slate-300 break-all select-all">
+                            None computed yet
+                        </span>
+                    </div>
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
+                        <span class="text-[11px] text-slate-400 block font-medium">Digital Signature:</span>
+                        <span id="sigDisplay" class="font-mono tabular-nums text-[11px] text-slate-300 break-all select-all">
+                            Pending sign action
+                        </span>
                     </div>
                 </div>
-            </div>
 
-            <!-- Download Button -->
-            <div class="mt-6">
-                <a id="downloadButton" download="signed_output.jpg" disabled 
-                    class="w-full py-3 px-4 bg-slate-800 text-slate-600 pointer-events-none font-medium rounded-xl transition-all flex items-center justify-center gap-2 text-sm">
-                    <i class="fa-solid fa-download"></i>
-                    Download Signed Image
-                </a>
-            </div>
-        </section>
+                <!-- Embedded EXIF JSON Inspection Box -->
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="font-semibold text-slate-300 uppercase tracking-wider">Embedded EXIF UserComment Manifest</span>
+                        <button onclick="copyMetadataJson()" id="btnCopyJson" class="text-indigo-400 hover:text-indigo-300 hidden">
+                            <i class="fa-regular fa-copy mr-1"></i>Copy JSON
+                        </button>
+                    </div>
+                    <pre id="metadataBox" class="bg-slate-950 border border-slate-800 rounded-xl p-3 h-36 overflow-y-auto text-[11px] font-mono tabular-nums text-slate-300 leading-relaxed select-all">Waiting for signature action...</pre>
+                </div>
+
+                <!-- Download Signed Image Button -->
+                <div class="pt-1">
+                    <a id="downloadButton" download="identity_signed.jpg" 
+                        class="w-full py-3 px-4 bg-slate-800 text-slate-600 pointer-events-none font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-xs sm:text-sm">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Download Authenticated Image (EXIF Embedded)</span>
+                    </a>
+                </div>
+            </section>
+        </div>
+
+        <!-- SECTION 2: VERIFY AUTHENTICITY VIEW (Initially Hidden) -->
+        <div id="viewVerify" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- Left Column: Verifier Dropzone & Quick Test (5 cols) -->
+            <section class="lg:col-span-5 bg-cardBg border border-cardBorder rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                <div>
+                    <h2 class="text-base font-bold text-slate-100">Drop Image to Verify</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Extracts EXIF UserComment, recalculates pixel SHA-256 hash, and verifies cryptographic proof.</p>
+                </div>
+
+                <!-- Verifier Dropzone -->
+                <div id="verifyDropzone" 
+                    ondragover="handleVerifyDragOver(event)" ondragleave="handleVerifyDragLeave(event)" ondrop="handleVerifyDrop(event)"
+                    class="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-700/80 border-dashed rounded-xl cursor-pointer bg-slate-950/40 hover:bg-slate-950/80 hover:border-emerald-500/60 transition-all">
+                    <label class="flex flex-col items-center justify-center w-full h-full cursor-pointer px-4 text-center">
+                        <i class="fa-solid fa-shield-halved text-emerald-400 text-3xl mb-2.5"></i>
+                        <p class="text-xs text-slate-200 font-semibold" id="verifyUploadLabel">Drop signed image or click to browse</p>
+                        <p class="text-[11px] text-slate-400 mt-1">Accepts any signed or modified image file</p>
+                        <input type="file" id="verifyImageUpload" accept="image/jpeg, image/png, image/webp" class="hidden" onchange="handleVerifyFileSelected(event)">
+                    </label>
+                </div>
+
+                <!-- Quick Action: Test Recently Signed Image -->
+                <div id="quickVerifyCard" class="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 space-y-2 hidden">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-medium text-slate-300">Recently Signed in this Session:</span>
+                        <button onclick="testRecentSignedImage()" class="text-emerald-400 hover:text-emerald-300 text-xs font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-play text-[10px]"></i>
+                            <span>Verify Output Image</span>
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Click to instantly load and test the cryptographic proof embedded into the file you just signed.</p>
+                </div>
+
+                <!-- Tamper Simulator / Educational Test -->
+                <div class="bg-slate-950/40 border border-slate-800/80 rounded-xl p-3.5 space-y-2">
+                    <span class="text-xs font-semibold text-slate-300 block">Tamper Resistance Test</span>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        If an attacker changes even a single pixel in an authentic image, the SHA-256 pixel digest diverges, and IdentityEmbed immediately alerts you to tampering.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Right Column: Verification Results & Diagnostic Card (7 cols) -->
+            <section class="lg:col-span-7 bg-cardBg border border-cardBorder rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                <div>
+                    <h2 class="text-base font-bold text-slate-100">Verification Inspection Report</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Cryptographic signature status and authenticity diagnostics.</p>
+                </div>
+
+                <!-- Verification Result Status Banner -->
+                <div id="verifyStatusBanner" class="p-4 rounded-xl border flex items-start gap-3.5 transition-all bg-slate-950/80 border-slate-800">
+                    <div id="verifyStatusIcon" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 text-slate-400 text-base">
+                        <i class="fa-solid fa-hourglass-start"></i>
+                    </div>
+                    <div>
+                        <h3 id="verifyStatusTitle" class="text-sm font-bold text-slate-200">Awaiting Image for Verification</h3>
+                        <p id="verifyStatusDesc" class="text-xs text-slate-400 mt-0.5">Upload or drag a signed image into the left box to inspect cryptographic claims.</p>
+                    </div>
+                </div>
+
+                <!-- Image Preview for Inspection -->
+                <div class="w-full h-44 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center justify-center overflow-hidden">
+                    <img id="verifyImagePreview" class="w-full h-full object-contain hidden" alt="Inspected Image">
+                    <p id="verifyPlaceholderText" class="text-xs text-slate-500">Image preview will appear here upon upload</p>
+                </div>
+
+                <!-- Diagnostic Breakdown Table -->
+                <div class="space-y-2">
+                    <span class="text-xs font-semibold text-slate-300 block">Provenance Diagnostics</span>
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl divide-y divide-slate-800/70 text-xs">
+                        <div class="p-2.5 flex items-center justify-between">
+                            <span class="text-slate-400">Creator Identity:</span>
+                            <span id="diagCreator" class="font-medium text-slate-200">None detected</span>
+                        </div>
+                        <div class="p-2.5 flex items-center justify-between">
+                            <span class="text-slate-400">Signed Timestamp:</span>
+                            <span id="diagTimestamp" class="font-mono tabular-nums text-slate-300 text-[11px]">—</span>
+                        </div>
+                        <div class="p-2.5 flex items-center justify-between">
+                            <span class="text-slate-400">Public Signing Key:</span>
+                            <span id="diagPubKey" class="font-mono tabular-nums text-slate-300 text-[11px] truncate max-w-xs select-all">—</span>
+                        </div>
+                        <div class="p-2.5 flex flex-col gap-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-400">Hash Match (Pixel Integrity):</span>
+                                <span id="diagHashMatch" class="font-semibold text-slate-400">—</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-[10px] font-mono tabular-nums pt-1 text-slate-400">
+                                <div>Signed: <span id="diagExpectedHash" class="text-slate-300 truncate block">—</span></div>
+                                <div>Actual: <span id="diagActualHash" class="text-slate-300 truncate block">—</span></div>
+                            </div>
+                        </div>
+                        <div class="p-2.5 flex items-center justify-between">
+                            <span class="text-slate-400">Ed25519 Cryptographic Proof:</span>
+                            <span id="diagCryptoStatus" class="font-semibold text-slate-400">—</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
     </main>
 
-    <footer class="w-full max-w-4xl mx-auto text-center py-4 text-xs text-slate-500 border-t border-slate-800">
-        <p>Your keys stay local. No external services or third-party platforms hold claims to your work.</p>
+    <!-- Support Section / Footer -->
+    <footer class="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        <div>
+            <p>Your cryptographic private keys never leave your browser. Pure client-side Ed25519 & EXIF processing.</p>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="openCashAppModal(5)" class="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1.5 transition-colors">
+                <i class="fa-solid fa-mug-hot text-xs"></i>
+                <span>Buy a Coffee via Cash App ($static9072)</span>
+            </button>
+        </div>
     </footer>
 
-    <!-- Notification Toast Element -->
-    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs z-50">
+    <!-- CASH APP MODERN INTERACTIVE DONATION MODAL -->
+    <div id="cashAppModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-slate-700/80 rounded-2xl w-full max-w-md p-6 shadow-2xl relative space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xl font-bold">
+                        <i class="fa-solid fa-dollar-sign"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                            Support IdentityEmbed
+                        </h3>
+                        <p class="text-xs text-slate-400">Direct contribution via Cash App</p>
+                    </div>
+                </div>
+                <button onclick="closeCashAppModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Cashtag Profile Badge & One-Click Copy -->
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+                <div>
+                    <span class="text-[11px] text-slate-400 block font-medium">Cash App Cashtag:</span>
+                    <span class="text-base font-bold font-mono text-emerald-400 tracking-tight">$static9072</span>
+                </div>
+                <button onclick="copyToClipboard('$static9072', 'Cashtag copied to clipboard!')" 
+                    class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition-all flex items-center gap-1.5">
+                    <i class="fa-regular fa-copy"></i>
+                    <span>Copy Tag</span>
+                </button>
+            </div>
+
+            <!-- Amount Preset Selectors -->
+            <div class="space-y-2">
+                <label class="block text-xs font-semibold text-slate-300">Choose Tip Amount</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button type="button" onclick="selectDonationAmount(1)" id="btnAmount1"
+                        class="py-2 px-3 text-xs font-bold rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:border-emerald-500 transition-all donation-preset active:scale-95">
+                        $1
+                    </button>
+                    <button type="button" onclick="selectDonationAmount(5)" id="btnAmount5"
+                        class="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-500 bg-emerald-600/20 text-emerald-300 donation-preset active:scale-95">
+                        $5
+                    </button>
+                    <button type="button" onclick="selectDonationAmount(10)" id="btnAmount10"
+                        class="py-2 px-3 text-xs font-bold rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:border-emerald-500 transition-all donation-preset active:scale-95">
+                        $10
+                    </button>
+                    <button type="button" onclick="selectCustomAmount()" id="btnAmountCustom"
+                        class="py-2 px-3 text-xs font-bold rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:border-emerald-500 transition-all donation-preset active:scale-95">
+                        Custom
+                    </button>
+                </div>
+                <!-- Custom amount field -->
+                <div id="customAmountRow" class="hidden pt-1">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-bold">$</span>
+                        <input type="number" id="customAmountInput" min="1" step="1" placeholder="Enter amount" oninput="updateCustomAmount()"
+                            class="w-full pl-7 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code Box for Mobile Cash App Scanning -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center space-y-2">
+                <span class="text-[11px] text-slate-400 font-medium">Scan with Phone Camera or Cash App</span>
+                <div id="cashAppQrCode" class="p-2 bg-white rounded-lg flex items-center justify-center shadow-md">
+                    <!-- QR code rendered dynamically -->
+                </div>
+                <span class="text-[10px] text-slate-500">Points directly to cash.app/$static9072</span>
+            </div>
+
+            <!-- Main Pay Button (Direct URL to Cash App) -->
+            <div>
+                <a id="btnPayCashApp" href="https://cash.app/$static9072/5" target="_blank" rel="noopener noreferrer"
+                    class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    <span id="btnPayText">Open Cash App ($5)</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs z-50 pointer-events-none">
         <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
-        <span id="toastMessage">Success message goes here</span>
+        <span id="toastMessage">Notification message</span>
     </div>
 
     <script>
-        let uploadedFile = null;
-        let generatedDataUrl = null;
+        // GLOBAL STATE
+        let activeMode = 'sign'; // 'sign' | 'verify'
+        let currentKeyPair = null;
+        let currentSecretKeyHex = '';
+        let currentPublicKeyHex = '';
+        let sourceFile = null;
+        let sourceImageElement = null;
+        let signedOutputDataUrl = null;
+        let signedProvenanceManifest = null;
+        let selectedDonation = 5;
+        let qrCodeInstance = null;
 
-        // Automatically populate a mock private key on load for convenience
-        window.onload = function() {
-            generateNewKey();
-        };
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initCryptographicKeys();
+            setupFormListeners();
+            setupKeyboardShortcuts();
+            renderCashAppQr(5);
+        });
 
-        function generateNewKey() {
-            const mockKey = "-----BEGIN PRIVATE KEY-----\n" +
-                Array.from({length: 4}, () => Math.random().toString(36).substring(2)).join('') +
-                "\n-----END PRIVATE KEY-----";
-            document.getElementById('privateKeyInput').value = mockKey;
-            showToast("New cryptographic key generated!", "success");
+        // ==========================================
+        // 1. CRYPTOGRAPHIC KEY MANAGEMENT (Ed25519)
+        // ==========================================
+        function initCryptographicKeys() {
+            generateEd25519Keypair();
         }
 
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        function generateEd25519Keypair() {
+            try {
+                if (typeof nacl === 'undefined' || !nacl.sign) {
+                    throw new Error("TweetNaCl cryptographic library not loaded");
+                }
+                const keypair = nacl.sign.keyPair();
+                currentKeyPair = keypair;
+                currentSecretKeyHex = bytesToHex(keypair.secretKey);
+                currentPublicKeyHex = bytesToHex(keypair.publicKey);
 
-            uploadedFile = file;
-            document.getElementById('uploadLabel').textContent = file.name;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const preview = document.getElementById('imagePreview');
-                const placeholder = document.getElementById('placeholderState');
-                
-                preview.src = e.target.result;
-                preview.classList.remove('hidden');
-                placeholder.classList.add('hidden');
-                
+                document.getElementById('privateKeyInput').value = currentSecretKeyHex;
+                document.getElementById('publicKeyDisplay').textContent = currentPublicKeyHex;
+                showToast("New Ed25519 cryptographic keypair generated!", "success");
                 checkFormReady();
+            } catch (err) {
+                console.error("Key generation error:", err);
+                showToast("Cryptographic initialization error: " + err.message, "error");
+            }
+        }
+
+        function toggleSecretVisibility() {
+            const input = document.getElementById('privateKeyInput');
+            const btn = document.getElementById('btnToggleSecret');
+            if (input.classList.contains('text-transparent')) {
+                input.classList.remove('text-transparent', 'select-none');
+                btn.innerHTML = '<i class="fa-solid fa-eye-slash mr-1"></i><span>Hide</span>';
+            } else {
+                input.classList.add('text-transparent', 'select-none');
+                btn.innerHTML = '<i class="fa-solid fa-eye mr-1"></i><span>Show</span>';
+            }
+        }
+
+        function exportKeypairJson() {
+            if (!currentSecretKeyHex || !currentPublicKeyHex) {
+                showToast("No active keypair to export.", "error");
+                return;
+            }
+            const keyData = {
+                algorithm: "Ed25519",
+                creator: document.getElementById('creatorName').value.trim() || "Anonymous",
+                publicKey: currentPublicKeyHex,
+                secretKey: currentSecretKeyHex,
+                exportedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(keyData, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ed25519_keypair_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Keypair exported securely.", "success");
+        }
+
+        // ==========================================
+        // 2. IMAGE UPLOAD & CANVAS PIPELINE
+        // ==========================================
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('uploadDropzone').classList.add('border-indigo-500', 'bg-slate-950/80');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('uploadDropzone').classList.remove('border-indigo-500', 'bg-slate-950/80');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('uploadDropzone').classList.remove('border-indigo-500', 'bg-slate-950/80');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processSelectedFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleImageFileSelected(e) {
+            if (e.target.files && e.target.files[0]) {
+                processSelectedFile(e.target.files[0]);
+            }
+        }
+
+        function processSelectedFile(file) {
+            sourceFile = file;
+            document.getElementById('uploadLabel').textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    sourceImageElement = img;
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    document.getElementById('placeholderState').classList.add('hidden');
+                    document.getElementById('badgeProcessingState').textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
+                    checkFormReady();
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
@@ -197,55 +599,463 @@
             const key = document.getElementById('privateKeyInput').value.trim();
             const signBtn = document.getElementById('signButton');
 
-            if (creator && key && uploadedFile) {
+            if (creator && key && sourceFile && sourceImageElement) {
                 signBtn.removeAttribute('disabled');
             } else {
                 signBtn.setAttribute('disabled', 'true');
             }
-        <div style="text-align: center; margin-top: 20px;">
-  <a href="https://cash.app/$static9072" target="_blank" style="background-color: #00D632; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-block;">
-    Support This Tool ($1 Donation)
-  </a>
-</div>
+        }
 
+        function setupFormListeners() {
+            document.getElementById('creatorName').addEventListener('input', checkFormReady);
+            document.getElementById('privateKeyInput').addEventListener('input', (e) => {
+                const hexVal = e.target.value.trim();
+                if (hexVal.length === 128) { // 64 bytes = 128 hex chars for secretKey
+                    try {
+                        const secBytes = hexToBytes(hexVal);
+                        const pubBytes = secBytes.slice(32);
+                        currentSecretKeyHex = hexVal;
+                        currentPublicKeyHex = bytesToHex(pubBytes);
+                        currentKeyPair = { secretKey: secBytes, publicKey: pubBytes };
+                        document.getElementById('publicKeyDisplay').textContent = currentPublicKeyHex;
+                    } catch(err) {}
+                }
+                checkFormReady();
+            });
+        }
 
-        // Listeners to check form readiness
-        document.getElementById('creatorName').addEventListener('input', checkFormReady);
-        document.getElementById('privateKeyInput').addEventListener('input', checkFormReady);
-
-        function processSigning() {
+        // ==========================================
+        // 3. CRYPTOGRAPHIC SIGNING & EXIF EMBEDDING
+        // ==========================================
+        async function processSigning() {
             const creatorName = document.getElementById('creatorName').value.trim();
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            
-            loadingOverlay.classList.remove('hidden');
+            const rightsStatement = document.getElementById('rightsStatement').value.trim();
+            const secretKeyHex = document.getElementById('privateKeyInput').value.trim();
 
-            setTimeout(() => {
-                loadingOverlay.classList.add('hidden');
+            if (!sourceImageElement || !creatorName || !secretKeyHex) {
+                showToast("Please ensure image, creator name, and secret key are set.", "error");
+                return;
+            }
 
-                // Simulate metadata embedded payload formatting
+            const overlay = document.getElementById('loadingOverlay');
+            const statusText = document.getElementById('loadingStatusText');
+            overlay.classList.remove('hidden');
+
+            try {
+                // Step 1: Draw to offscreen canvas to obtain raw uncompressed pixel data
+                statusText.textContent = "Extracting pixel buffer & computing SHA-256...";
+                await sleep(50);
+
+                const width = sourceImageElement.naturalWidth;
+                const height = sourceImageElement.naturalHeight;
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(sourceImageElement, 0, 0);
+
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const pixelBuffer = imageData.data.buffer; // Raw RGBA bytes
+
+                // Compute real cryptographic SHA-256 hash of the pixel buffer
+                const hashBuffer = await crypto.subtle.digest('SHA-256', pixelBuffer);
+                const imageHashHex = bytesToHex(new Uint8Array(hashBuffer));
+                document.getElementById('digestDisplay').textContent = `sha256:${imageHashHex.substring(0, 16)}...`;
+
+                // Step 2: Prepare Provenance Payload
+                statusText.textContent = "Generating Ed25519 digital signature...";
+                await sleep(50);
+
                 const timestamp = new Date().toISOString();
-                const mockSignatureHash = "sha256:" + Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join('');
-                
-                const metadataPayload = {
-                    provenance: {
+                const secretKeyBytes = hexToBytes(secretKeyHex);
+                const publicKeyBytes = currentKeyPair?.publicKey || secretKeyBytes.slice(32);
+                const publicKeyHex = bytesToHex(publicKeyBytes);
+
+                // Canonical message to sign: imageHash + creator + timestamp
+                const canonicalMessage = `IDENTITY_EMBED_V1|${imageHashHex}|${creatorName}|${timestamp}|${width}x${height}`;
+                const messageBytes = nacl.util.decodeUTF8(canonicalMessage);
+
+                // Sign with Ed25519
+                const signatureBytes = nacl.sign.detached(messageBytes, secretKeyBytes);
+                const signatureHex = bytesToHex(signatureBytes);
+                document.getElementById('sigDisplay').textContent = `ed25519:${signatureHex.substring(0, 16)}...`;
+
+                // Step 3: Package Provenance Manifest
+                const provenanceManifest = {
+                    identityEmbed: {
+                        version: "1.0",
+                        algorithm: "Ed25519",
                         creator: creatorName,
+                        rights: rightsStatement,
                         timestamp: timestamp,
-                        tool: "IdentityEmbed Dashboard v1.0"
-                    },
-                    signature: mockSignatureHash
+                        dimensions: { width: width, height: height },
+                        imageHash: imageHashHex,
+                        canonicalMessage: canonicalMessage,
+                        publicKey: publicKeyHex,
+                        signature: signatureHex
+                    }
                 };
+                signedProvenanceManifest = provenanceManifest;
 
-                document.getElementById('metadataBox').textContent = JSON.stringify(metadataPayload, null, 2);
+                // Step 4: Embed into EXIF UserComment
+                statusText.textContent = "Injecting binary EXIF metadata structure...";
+                await sleep(50);
 
-                // Enable download
+                // Export canvas to high-quality JPEG data URL
+                const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+
+                // Prepare piexif structure
+                let exifObj = { "0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": null };
+                try {
+                    const existing = piexif.load(jpegDataUrl);
+                    if (existing) exifObj = existing;
+                } catch(e) {}
+
+                // Embed into Exif UserComment (tag 37510 / 0x9286)
+                const manifestString = JSON.stringify(provenanceManifest);
+                exifObj["Exif"][piexif.ExifIFD.UserComment] = manifestString;
+
+                const exifBytes = piexif.dump(exifObj);
+                const signedDataUrl = piexif.insert(exifBytes, jpegDataUrl);
+                signedOutputDataUrl = signedDataUrl;
+
+                // Update UI preview with the signed data
+                document.getElementById('imagePreview').src = signedDataUrl;
+                document.getElementById('metadataBox').textContent = JSON.stringify(provenanceManifest, null, 2);
+                document.getElementById('btnCopyJson').classList.remove('hidden');
+
+                // Enable download button
                 const downloadBtn = document.getElementById('downloadButton');
-                downloadBtn.href = document.getElementById('imagePreview').src;
-                downloadBtn.removeAttribute('disabled');
+                downloadBtn.href = signedDataUrl;
+                downloadBtn.download = `identity_signed_${creatorName.replace(/\s+/g, '_').toLowerCase()}.jpg`;
                 downloadBtn.classList.remove('bg-slate-800', 'text-slate-600', 'pointer-events-none');
-                downloadBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500', 'text-white', 'shadow-lg', 'shadow-emerald-600/25');
+                downloadBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500', 'text-white', 'shadow-lg');
 
-                showToast("Signature successfully embedded into EXIF metadata!", "success");
-            }, 1200);
+                // Reveal quick test in Verifier
+                document.getElementById('quickVerifyCard').classList.remove('hidden');
+
+                overlay.classList.add('hidden');
+                showToast("Cryptographic signature & EXIF embedded successfully!", "success");
+            } catch (err) {
+                console.error("Signing failed:", err);
+                overlay.classList.add('hidden');
+                showToast("Signing error: " + err.message, "error");
+            }
+        }
+
+        // ==========================================
+        // 4. VERIFICATION PIPELINE
+        // ==========================================
+        function handleVerifyDragOver(e) {
+            e.preventDefault();
+            document.getElementById('verifyDropzone').classList.add('border-emerald-500', 'bg-slate-950/80');
+        }
+
+        function handleVerifyDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('verifyDropzone').classList.remove('border-emerald-500', 'bg-slate-950/80');
+        }
+
+        function handleVerifyDrop(e) {
+            e.preventDefault();
+            document.getElementById('verifyDropzone').classList.remove('border-emerald-500', 'bg-slate-950/80');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                verifyImageFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleVerifyFileSelected(e) {
+            if (e.target.files && e.target.files[0]) {
+                verifyImageFile(e.target.files[0]);
+            }
+        }
+
+        function testRecentSignedImage() {
+            if (!signedOutputDataUrl) {
+                showToast("No signed image in this session yet.", "error");
+                return;
+            }
+            switchMode('verify');
+            verifyImageDataUrl(signedOutputDataUrl, "identity_signed.jpg");
+        }
+
+        function verifyImageFile(file) {
+            document.getElementById('verifyUploadLabel').textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                verifyImageDataUrl(e.target.result, file.name);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function verifyImageDataUrl(dataUrl, fileName) {
+            // Update preview
+            const preview = document.getElementById('verifyImagePreview');
+            preview.src = dataUrl;
+            preview.classList.remove('hidden');
+            document.getElementById('verifyPlaceholderText').classList.add('hidden');
+
+            setVerificationStatus('checking', 'Analyzing EXIF and verifying cryptographic proof...');
+
+            try {
+                // Step 1: Read EXIF UserComment
+                let exifData = null;
+                try {
+                    exifData = piexif.load(dataUrl);
+                } catch(e) {
+                    console.warn("Could not parse EXIF:", e);
+                }
+
+                let provenanceManifest = null;
+                const rawComment = exifData?.["Exif"]?.[piexif.ExifIFD.UserComment];
+
+                if (rawComment) {
+                    try {
+                        provenanceManifest = JSON.parse(rawComment);
+                    } catch(e) {
+                        // Might contain EXIF string encoding prefix
+                        try {
+                            const trimmed = rawComment.substring(rawComment.indexOf('{'));
+                            provenanceManifest = JSON.parse(trimmed);
+                        } catch(e2) {}
+                    }
+                }
+
+                // If no IdentityEmbed payload found
+                if (!provenanceManifest || !provenanceManifest.identityEmbed) {
+                    setVerificationStatus('unsigned', 'No IdentityEmbed Signature Found', 
+                        'This image does not contain an embedded cryptographic provenance record in its EXIF metadata.');
+                    resetDiagnostics();
+                    return;
+                }
+
+                const manifest = provenanceManifest.identityEmbed;
+                document.getElementById('diagCreator').textContent = manifest.creator || "Unknown";
+                document.getElementById('diagTimestamp').textContent = new Date(manifest.timestamp).toLocaleString();
+                document.getElementById('diagPubKey').textContent = manifest.publicKey || "N/A";
+                document.getElementById('diagExpectedHash').textContent = manifest.imageHash || "N/A";
+
+                // Step 2: Recalculate real pixel SHA-256 hash
+                const img = new Image();
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+
+                    const pixelBuffer = ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer;
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', pixelBuffer);
+                    const computedHashHex = bytesToHex(new Uint8Array(hashBuffer));
+                    document.getElementById('diagActualHash').textContent = computedHashHex;
+
+                    const isHashMatched = (computedHashHex.toLowerCase() === manifest.imageHash.toLowerCase());
+                    document.getElementById('diagHashMatch').innerHTML = isHashMatched 
+                        ? '<span class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i>Match (Pixels Unaltered)</span>'
+                        : '<span class="text-rose-400"><i class="fa-solid fa-xmark mr-1"></i>Mismatch (Pixels Modified)</span>';
+
+                    // Step 3: Verify Ed25519 signature
+                    let isSigValid = false;
+                    try {
+                        const messageBytes = nacl.util.decodeUTF8(manifest.canonicalMessage);
+                        const signatureBytes = hexToBytes(manifest.signature);
+                        const publicKeyBytes = hexToBytes(manifest.publicKey);
+                        isSigValid = nacl.sign.detached.verify(messageBytes, signatureBytes, publicKeyBytes);
+                    } catch(sigErr) {
+                        console.error("Signature verification failed:", sigErr);
+                    }
+
+                    document.getElementById('diagCryptoStatus').innerHTML = isSigValid
+                        ? '<span class="text-emerald-400"><i class="fa-solid fa-shield-check mr-1"></i>Valid Ed25519 Signature</span>'
+                        : '<span class="text-rose-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Invalid Cryptographic Signature</span>';
+
+                    // Conclude status
+                    if (isHashMatched && isSigValid) {
+                        setVerificationStatus('valid', 'Cryptographically Authenticated & Unaltered',
+                            `Verified authorship by ${manifest.creator}. Pixel integrity matches the digital signature exactly.`);
+                        showToast("Authentication Verified: Image is authentic!", "success");
+                    } else if (!isHashMatched && isSigValid) {
+                        setVerificationStatus('tampered', 'Image Content Altered / Tampered',
+                            `Signature matches author ${manifest.creator}, but pixel content has been modified after signing!`);
+                        showToast("Warning: Image tampering detected!", "error");
+                    } else {
+                        setVerificationStatus('tampered', 'Cryptographic Verification Failed',
+                            'The signature or author public key is invalid or does not correspond to the provenance record.');
+                        showToast("Verification failed.", "error");
+                    }
+                };
+                img.src = dataUrl;
+
+            } catch (err) {
+                console.error("Verification error:", err);
+                setVerificationStatus('tampered', 'Verification Error', err.message);
+            }
+        }
+
+        function setVerificationStatus(type, title, desc) {
+            const banner = document.getElementById('verifyStatusBanner');
+            const icon = document.getElementById('verifyStatusIcon');
+            const titleEl = document.getElementById('verifyStatusTitle');
+            const descEl = document.getElementById('verifyStatusDesc');
+
+            titleEl.textContent = title;
+            descEl.textContent = desc || '';
+
+            banner.className = "p-4 rounded-xl border flex items-start gap-3.5 transition-all ";
+            if (type === 'valid') {
+                banner.classList.add("bg-emerald-950/40", "border-emerald-600/60");
+                icon.className = "w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center shrink-0 text-base";
+                icon.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else if (type === 'tampered') {
+                banner.classList.add("bg-rose-950/40", "border-rose-600/60");
+                icon.className = "w-8 h-8 rounded-lg bg-rose-600/20 text-rose-400 flex items-center justify-center shrink-0 text-base";
+                icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            } else if (type === 'unsigned') {
+                banner.classList.add("bg-slate-900/80", "border-slate-700/80");
+                icon.className = "w-8 h-8 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center shrink-0 text-base";
+                icon.innerHTML = '<i class="fa-solid fa-file-circle-question"></i>';
+            } else {
+                banner.classList.add("bg-slate-900/80", "border-slate-800");
+                icon.className = "w-8 h-8 rounded-lg bg-slate-800 text-indigo-400 flex items-center justify-center shrink-0 text-base";
+                icon.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            }
+        }
+
+        function resetDiagnostics() {
+            document.getElementById('diagCreator').textContent = "None detected";
+            document.getElementById('diagTimestamp').textContent = "—";
+            document.getElementById('diagPubKey').textContent = "—";
+            document.getElementById('diagHashMatch').textContent = "—";
+            document.getElementById('diagExpectedHash').textContent = "—";
+            document.getElementById('diagActualHash').textContent = "—";
+            document.getElementById('diagCryptoStatus').textContent = "—";
+        }
+
+        // ==========================================
+        // 5. CASH APP INTERACTIVE MODAL & DONATIONS
+        // ==========================================
+        function openCashAppModal(amount = 5) {
+            selectDonationAmount(amount);
+            document.getElementById('cashAppModal').classList.remove('hidden');
+        }
+
+        function closeCashAppModal() {
+            document.getElementById('cashAppModal').classList.add('hidden');
+        }
+
+        function selectDonationAmount(amount) {
+            selectedDonation = amount;
+            document.querySelectorAll('.donation-preset').forEach(btn => {
+                btn.classList.remove('border-emerald-500', 'bg-emerald-600/20', 'text-emerald-300');
+                btn.classList.add('border-slate-700', 'bg-slate-900', 'text-slate-200');
+            });
+            document.getElementById('customAmountRow').classList.add('hidden');
+
+            const activeBtn = document.getElementById(`btnAmount${amount}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-slate-700', 'bg-slate-900', 'text-slate-200');
+                activeBtn.classList.add('border-emerald-500', 'bg-emerald-600/20', 'text-emerald-300');
+            }
+
+            updatePayLink(amount);
+            renderCashAppQr(amount);
+        }
+
+        function selectCustomAmount() {
+            document.querySelectorAll('.donation-preset').forEach(btn => {
+                btn.classList.remove('border-emerald-500', 'bg-emerald-600/20', 'text-emerald-300');
+                btn.classList.add('border-slate-700', 'bg-slate-900', 'text-slate-200');
+            });
+            const customBtn = document.getElementById('btnAmountCustom');
+            customBtn.classList.add('border-emerald-500', 'bg-emerald-600/20', 'text-emerald-300');
+            document.getElementById('customAmountRow').classList.remove('hidden');
+            document.getElementById('customAmountInput').focus();
+            updateCustomAmount();
+        }
+
+        function updateCustomAmount() {
+            const val = parseInt(document.getElementById('customAmountInput').value, 10);
+            const amount = (!isNaN(val) && val > 0) ? val : null;
+            selectedDonation = amount;
+            updatePayLink(amount);
+            renderCashAppQr(amount);
+        }
+
+        function updatePayLink(amount) {
+            const payUrl = amount ? `https://cash.app/$static9072/${amount}` : `https://cash.app/$static9072`;
+            const btn = document.getElementById('btnPayCashApp');
+            const btnText = document.getElementById('btnPayText');
+            btn.href = payUrl;
+            btnText.textContent = amount ? `Open Cash App ($${amount})` : `Open Cash App ($static9072)`;
+        }
+
+        function renderCashAppQr(amount) {
+            const qrContainer = document.getElementById('cashAppQrCode');
+            qrContainer.innerHTML = '';
+            const targetUrl = amount ? `https://cash.app/$static9072/${amount}` : `https://cash.app/$static9072`;
+
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrContainer, {
+                        text: targetUrl,
+                        width: 128,
+                        height: 128,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                }
+            } catch(e) {
+                console.warn("QR code render error:", e);
+            }
+        }
+
+        // ==========================================
+        // 6. UI NAVIGATION & HELPERS
+        // ==========================================
+        function switchMode(mode) {
+            activeMode = mode;
+            const tabSign = document.getElementById('tabSign');
+            const tabVerify = document.getElementById('tabVerify');
+            const viewSign = document.getElementById('viewSign');
+            const viewVerify = document.getElementById('viewVerify');
+
+            if (mode === 'sign') {
+                tabSign.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap shrink-0 bg-indigo-600 text-white shadow-sm";
+                tabSign.setAttribute('aria-selected', 'true');
+                tabVerify.className = "px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2 whitespace-nowrap shrink-0";
+                tabVerify.setAttribute('aria-selected', 'false');
+                viewSign.classList.remove('hidden');
+                viewVerify.classList.add('hidden');
+            } else {
+                tabVerify.className = "px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap shrink-0 bg-indigo-600 text-white shadow-sm";
+                tabVerify.setAttribute('aria-selected', 'true');
+                tabSign.className = "px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all flex items-center gap-2 whitespace-nowrap shrink-0";
+                tabSign.setAttribute('aria-selected', 'false');
+                viewVerify.classList.remove('hidden');
+                viewSign.classList.add('hidden');
+            }
+        }
+
+        function copyMetadataJson() {
+            if (signedProvenanceManifest) {
+                copyToClipboard(JSON.stringify(signedProvenanceManifest, null, 2), "Provenance JSON copied!");
+            }
+        }
+
+        function copyToClipboard(text, successMessage = "Copied to clipboard!") {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(successMessage, "success");
+            }).catch(() => {
+                // Fallback
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast(successMessage, "success");
+            });
         }
 
         function showToast(message, type = 'success') {
@@ -254,14 +1064,47 @@
             const iconEl = document.getElementById('toastIcon');
 
             msgEl.textContent = message;
-            if(type === 'success') {
+            if (type === 'success') {
                 iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            } else {
+                iconEl.className = "fa-solid fa-triangle-exclamation text-rose-400 text-base";
             }
 
             toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
+            clearTimeout(window._toastTimeout);
+            window._toastTimeout = setTimeout(() => {
                 toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
+            }, 3200);
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeCashAppModal();
+                }
+            });
+            document.getElementById('cashAppModal').addEventListener('click', (e) => {
+                if (e.target === document.getElementById('cashAppModal')) {
+                    closeCashAppModal();
+                }
+            });
+        }
+
+        // Crypto Utility functions
+        function bytesToHex(bytes) {
+            return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function hexToBytes(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < bytes.length; i++) {
+                bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+            }
+            return bytes;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
     </script>
 </body>
