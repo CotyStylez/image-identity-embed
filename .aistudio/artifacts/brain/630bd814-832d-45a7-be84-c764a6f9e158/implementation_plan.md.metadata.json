@@ -1,6 +1,0 @@
-{
-  "summary":  "Implementation plan to make IdentityEmbed fully functional with client-side Ed25519 signing, real EXIF embedding and verification, and an interactive Cash App donation modal.",
-  "updatedAt":  "2026-10-11T17:42:04.802981493Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}
