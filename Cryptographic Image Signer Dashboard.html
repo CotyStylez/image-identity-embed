@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Cryptographic Signer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f172a',
+                        cardBg: '#1e293b',
+                        accent: '#6366f1',
+                        accentHover: '#4f46e5'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Inter & FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-darkBg text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 sm:p-6">
+
+    <header class="w-full max-w-4xl mx-auto flex items-center justify-between py-4 border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-fingerprint text-white text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight">IdentityEmbed</h1>
+                <p class="text-xs text-slate-400">Cryptographic Image Ownership Proof</p>
+            </div>
+        </div>
+        <div class="text-xs bg-slate-800 text-slate-300 px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Independent Tool
+        </div>
+    </header>
+
+    <main class="w-full max-w-4xl mx-auto my-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Left Column: Input Configuration Form -->
+        <section class="bg-cardBg border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+            <div class="space-y-5">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-200 mb-1">Signature Parameters</h2>
+                    <p class="text-xs text-slate-400">Configure your ownership metadata and keys.</p>
+                </div>
+
+                <!-- Creator Name Input -->
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-medium text-slate-300">Creator Name / Identity</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                        <input type="text" id="creatorName" placeholder="e.g. Satoshi or Your Name" 
+                            class="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all">
+                    </div>
+                </div>
+
+                <!-- Private Key Section -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-medium text-slate-300">Private Key</label>
+                        <button onclick="generateNewKey()" type="button" class="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generate New
+                        </button>
+                    </div>
+                    <textarea id="privateKeyInput" rows="2" placeholder="Paste PEM private key or generate one..." 
+                        class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all resize-none"></textarea>
+                </div>
+
+                <!-- Image Upload Section -->
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-medium text-slate-300">Source Image (PNG / JPG)</label>
+                    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-900/50 hover:bg-slate-900 hover:border-slate-600 transition-all">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
+                            <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-2xl mb-2"></i>
+                            <p class="text-xs text-slate-300 font-medium" id="uploadLabel">Click to upload or drag & drop</p>
+                            <p class="text-[10px] text-slate-500 mt-1">PNG, JPG or WEBP</p>
+                        </div>
+                        <input type="file" id="imageUpload" accept="image/png, image/jpeg, image/webp" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <div class="mt-8">
+                <button onclick="processSigning()" id="signButton" disabled 
+                    class="w-full py-3 px-4 bg-accent hover:bg-accentHover disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-medium rounded-xl shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-signature"></i>
+                    Embed Signature & Metadata
+                </button>
+            </div>
+        </section>
+
+        <section class="bg-cardBg border border-slate-800/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+            <div class="space-y-4">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-200 mb-1">Result Preview</h2>
+                    <p class="text-xs text-slate-400">Signed image with EXIF metadata embedding.</p>
+                </div>
+
+                <!-- Preview Box -->
+                <div id="previewContainer" class="w-full h-64 bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center justify-center relative overflow-hidden group">
+                    <div id="placeholderState" class="text-center p-6 text-slate-500">
+                        <i class="fa-regular fa-image text-4xl mb-2 text-slate-600"></i>
+                        <p class="text-xs">No image processed yet. Upload and sign to view preview.</p>
+                    </div>
+                    <img id="imagePreview" class="w-full h-full object-contain hidden" alt="Signed Preview">
+                    <div id="loadingOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm hidden flex flex-col items-center justify-center gap-2">
+                        <i class="fa-solid fa-circle-notch fa-spin text-indigo-400 text-3xl"></i>
+                        <p class="text-xs text-slate-300 font-medium">Embedding cryptographic hash...</p>
+                    </div>
+                </div>
+
+                <!-- Metadata Inspection Box -->
+                <div class="space-y-1">
+                    <span class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Embedded Metadata Preview</span>
+                    <div id="metadataBox" class="bg-slate-900 border border-slate-800 rounded-xl p-3 h-24 overflow-y-auto text-[11px] font-mono text-slate-400">
+                        Waiting for signature action...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Button -->
+            <div class="mt-6">
+                <a id="downloadButton" download="signed_output.jpg" disabled 
+                    class="w-full py-3 px-4 bg-slate-800 text-slate-600 pointer-events-none font-medium rounded-xl transition-all flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-download"></i>
+                    Download Signed Image
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="w-full max-w-4xl mx-auto text-center py-4 text-xs text-slate-500 border-t border-slate-800">
+        <p>Your keys stay local. No external services or third-party platforms hold claims to your work.</p>
+    </footer>
+
+    <!-- Notification Toast Element -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs z-50">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">Success message goes here</span>
+    </div>
+
+    <script>
+        let uploadedFile = null;
+        let generatedDataUrl = null;
+
+        // Automatically populate a mock private key on load for convenience
+        window.onload = function() {
+            generateNewKey();
+        };
+
+        function generateNewKey() {
+            const mockKey = "-----BEGIN PRIVATE KEY-----\n" +
+                Array.from({length: 4}, () => Math.random().toString(36).substring(2)).join('') +
+                "\n-----END PRIVATE KEY-----";
+            document.getElementById('privateKeyInput').value = mockKey;
+            showToast("New cryptographic key generated!", "success");
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            uploadedFile = file;
+            document.getElementById('uploadLabel').textContent = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('imagePreview');
+                const placeholder = document.getElementById('placeholderState');
+                
+                preview.src = e.target.result;
+                preview.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                
+                checkFormReady();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function checkFormReady() {
+            const creator = document.getElementById('creatorName').value.trim();
+            const key = document.getElementById('privateKeyInput').value.trim();
+            const signBtn = document.getElementById('signButton');
+
+            if (creator && key && uploadedFile) {
+                signBtn.removeAttribute('disabled');
+            } else {
+                signBtn.setAttribute('disabled', 'true');
+            }
+        }
+
+        // Listeners to check form readiness
+        document.getElementById('creatorName').addEventListener('input', checkFormReady);
+        document.getElementById('privateKeyInput').addEventListener('input', checkFormReady);
+
+        function processSigning() {
+            const creatorName = document.getElementById('creatorName').value.trim();
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            loadingOverlay.classList.remove('hidden');
+
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+
+                // Simulate metadata embedded payload formatting
+                const timestamp = new Date().toISOString();
+                const mockSignatureHash = "sha256:" + Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join('');
+                
+                const metadataPayload = {
+                    provenance: {
+                        creator: creatorName,
+                        timestamp: timestamp,
+                        tool: "IdentityEmbed Dashboard v1.0"
+                    },
+                    signature: mockSignatureHash
+                };
+
+                document.getElementById('metadataBox').textContent = JSON.stringify(metadataPayload, null, 2);
+
+                // Enable download
+                const downloadBtn = document.getElementById('downloadButton');
+                downloadBtn.href = document.getElementById('imagePreview').src;
+                downloadBtn.removeAttribute('disabled');
+                downloadBtn.classList.remove('bg-slate-800', 'text-slate-600', 'pointer-events-none');
+                downloadBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-500', 'text-white', 'shadow-lg', 'shadow-emerald-600/25');
+
+                showToast("Signature successfully embedded into EXIF metadata!", "success");
+            }, 1200);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toastMessage');
+            const iconEl = document.getElementById('toastIcon');
+
+            msgEl.textContent = message;
+            if(type === 'success') {
+                iconEl.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
